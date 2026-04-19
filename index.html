@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>PWA Test App</title>
+    <style>
+        body { margin: 0; background: #111; color: white; font-family: sans-serif; overflow: hidden; display: flex; flex-direction: column; align-items: center; }
+        
+        /* キャンバス共通設定：中身を中央に配置 */
+        .canvas {
+            width: 90vw; margin: 10px 0; background: #222;
+            display: flex; align-items: center; justify-content: center;
+            position: relative; overflow: hidden;
+        }
+        #nav-container { height: 30vh; }
+        #main-container { height: 50vh; background: #333; }
+
+        /* 画像と枠を保持するコンテナ：これ自体のサイズを画像に合わせる */
+        .stage { position: relative; display: inline-block; }
+
+        .preview-img { display: block; max-height: 100%; max-width: 100%; }
+
+        /* 枠のスタイル */
+        .crop-box { position: absolute; border: 2px solid blue; box-sizing: border-box; pointer-events: none; }
+        .nav-box { position: absolute; border: 1px solid red; background: rgba(255, 0, 0, 0.2); pointer-events: none; }
+
+        .footer { margin-top: 10px; }
+        .file-btn {
+            display: inline-block; width: 60px; height: 60px;
+            background: white; border-radius: 50%; font-size: 30px;
+            line-height: 60px; cursor: pointer; text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ナビキャンバス（中央表示） -->
+    <div id="nav-container" class="canvas">
+        <div id="nav-stage" class="stage">
+            <div id="nav-box" class="nav-box"></div>
+            <img id="nav-img" class="preview-img">
+        </div>
+    </div>
+
+    <!-- 作業キャンバス -->
+    <div id="main-container" class="canvas">
+        <div id="main-instruction">画像を選択してください</div>
+        <div id="main-stage" class="stage" style="display:none;">
+            <div id="crop-box" class="crop-box"></div>
+            <img id="main-img" class="preview-img">
+        </div>
+    </div>
+
+    <div class="footer">
+        <input type="file" id="file-input" accept="image/*" hidden>
+        <label for="file-input" class="file-btn">📁</label>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('file-input');
+        const navImg = document.getElementById('nav-img');
+        const mainImg = document.getElementById('main-img');
+        const navBox = document.getElementById('nav-box');
+        const cropBox = document.getElementById('crop-box');
+        const mainStage = document.getElementById('main-stage');
+        const instruction = document.getElementById('main-instruction');
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const src = event.target.result;
+                    navImg.src = src;
+                    mainImg.src = src;
+                    
+                    instruction.style.display = 'none';
+                    mainStage.style.display = 'block';
+
+                    // 枠の初期位置（画像に対しての％）
+                    updateBox(10, 10, 80, 80);
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        function updateBox(x, y, w, h) {
+            [navBox, cropBox].forEach(box => {
+                box.style.left = x + '%';
+                box.style.top = y + '%';
+                box.style.width = w + '%';
+                box.style.height = h + '%';
+            });
+        }
+    </script>
+</body>
+</html>
