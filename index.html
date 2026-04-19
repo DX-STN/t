@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>PWA Test App</title>
+    <style>
+        body { margin: 0; background: #111; overflow: hidden; display: flex; flex-direction: column; align-items: center; }
+        .canvas { width: 90vw; margin: 10px 0; background: #222; position: relative; overflow: hidden; touch-action: none; }
+        #nav-container { height: 30vh; }
+        #main-container { height: 50vh; background: #333; }
+        #main-img, #nav-img { position: absolute; top: 0; left: 0; transform-origin: 0 0; pointer-events: none; }
+        
+        .crop-box { position: absolute; border: 2px solid blue; box-sizing: border-box; z-index: 10; }
+        .nav-box { position: absolute; border: 1px solid red; background: rgba(255, 0, 0, 0.2); z-index: 10; pointer-events: none; }
+
+        /* 辺の判定エリア：透明だが広く取る */
+        .handle { position: absolute; background: rgba(0, 100, 255, 0.1); }
+        .h-n { top: -20px; left: 0; right: 0; height: 40px; cursor: ns-resize; }
+        .h-s { bottom: -20px; left: 0; right: 0; height: 40px; cursor: ns-resize; }
+        .h-e { right: -20px; top: 0; bottom: 0; width: 40px; cursor: ew-resize; }
+        .h-w { left: -20px; top: 0; bottom: 0; width: 40px; cursor: ew-resize; }
+
+        .footer { margin-top: 10px; }
+        .file-btn { display: inline-block; width: 60px; height: 60px; background: white; border-radius: 50%; font-size: 30px; line-height: 60px; cursor: pointer; text-align: center; color: black; }
+    </style>
+</head>
+<body>
+    <div id="nav-container" class="canvas"><img id="nav-img"><div id="nav-box" class="nav-box"></div></div>
+    <div id="main-container" class="canvas">
+        <img id="main-img">
+        <div id="crop-box" class="crop-box">
+            <div class="handle h-n" data-edge="n"></div><div class="handle h-s" data-edge="s"></div>
+            <div class="handle h-e" data-edge="e"></div><div class="handle h-w" data-edge="w"></div>
+        </div>
+    </div>
+    <div class="footer"><input type="file" id="file-input" accept="image/*" hidden><label for="file-input" class="file-btn">📁</label></div>
+
+    <script>
+        const navImg = document.getElementById('nav-img'), mainImg = document.getElementById('main-img'), navBox = document.getElementById('nav-box'), cropBox = document.getElementById('crop-box');
+        const mCont = document.getElementById('main-container'), nCont = document.getElementById('nav-container');
+
+        let img = { w: 0, h: 0 };
+        let view = { x: 0, y: 0, scale: 1 }; 
+        let crop = { x: 0, y: 0, w: 200, h: 100 }; // 枠の座標
+        let touch = { mode: '', lastX: 0, lastY: 0, lastDist: 0, lastScale: 1, edge: '' };
+
+        document.getElementById('file-input').onchange = (e) => {
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                navImg.src = mainImg.src = ev.target.result;
+                mainImg.onload = () => {
+                    img.w = mainImg.naturalWidth; img.h = mainImg.naturalHeight;
+                    const mRect = mCont.getBoundingClientRect();
+                    view.scale = Math.min(mRect.width / img.w, mRect.height / img.h);
+                    view.x = (mRect.width - img.w * view.scale) / 2;
+                    view.y = (mRect.height - img.h * view.scale) / 2;
+                    crop = { x: (mRect.width-200)/2, y: (mRect.height-100)/2, w: 200, h: 100 };
+                    update();
+                };
+            };
+            reader.readAsDataURL(e.target.files);
+        };
+
+        mCont.ontouchstart = (e) => {
+            if (e.touches.length === 1) {
+                const target = e.target;
+                if (target.classList.contains('handle')) {
+                    touch.mode = 'edit';
+                    touch.edge = target.dataset.edge;
+                } else {
+                    touch.mode = 'scroll';
+                }
+                touch.lastX = e.touches[0].pageX; touch.lastY = e.touches[0].pageY;
+            } else if (e.touches.length === 2) {
+                touch.mode = 'zoom';
+                touch.lastDist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+                touch.lastScale = view.scale;
+            }
+        };
+
+        mCont.ontouchmove = (e) => {
+            e.preventDefault();
+            if (touch.mode === 'scroll') {
+                view.x += (e.touches[0].pageX - touch.lastX);
+                view.y += (e.touches[0].pageY - touch.lastY);
+            } else if (touch.mode === 'edit') {
+                const dx = e.touches[0].pageX - touch.lastX;
+                const dy = e.touches[0].pageY - touch.lastY;
+                if (touch.edge === 'n') { crop.y += dy; crop.h -= dy; }
+                if (touch.edge === 's') { crop.h += dy; }
+                if (touch.edge === 'e') { crop.w += dx; }
+                if (touch.edge === 'w') { crop.x += dx; crop.w -= dx; }
+            } else if (touch.mode === 'zoom') {
+                const dist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+                const newScale = touch.lastScale * (dist / touch.lastDist);
+                const mRect = mCont.getBoundingClientRect();
+                const cx = mRect.width/2, cy = mRect.height/2;
+                view.x = cx - (cx - view.x) * (newScale / view.scale);
+                view.y = cy - (cy - view.y) * (newScale / view.scale);
+                view.scale = newScale;
+            }
+            touch.lastX = e.touches[0].pageX; touch.lastY = e.touches[0].pageY;
+            update();
+        };
+
+        mCont.ontouchend = () => {
+            if (touch.mode === 'edit') fitToCrop();
+            touch.mode = '';
+        };
+
+        function fitToCrop() {
+            const mRect = mCont.getBoundingClientRect();
+            // 枠の長辺をキャンバスいっぱいに表示するための倍率を計算
+            const targetScale = Math.min(mRect.width / crop.w, mRect.height / crop.h) * view.scale;
+            
+            // 枠の中心をキャンバスの中心に持ってくる移動量を計算
+            const cropCX = crop.x + crop.w/2;
+            const cropCY = crop.y + crop.h/2;
+            const targetX = mRect.width/2 - (cropCX - view.x) * (targetScale / view.scale);
+            const targetY = mRect.height/2 - (cropCY - view.y) * (targetScale / view.scale);
+
+            // 更新（アニメーションなしで瞬時に反映。操作感を高めるため）
+            view.scale = targetScale;
+            view.x = targetX; view.y = targetY;
+            
+            // 枠を元のキャンバス中央位置に戻す（ズーム後の新しい基準）
+            crop = { x: (mRect.width-crop.w)/2, y: (mRect.height-crop.h)/2, w: crop.w, h: crop.h };
+            update();
+        }
+
+        function update() {
+            mainImg.style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.scale})`;
+            cropBox.style.left = crop.x + 'px'; cropBox.style.top = crop.y + 'px';
+            cropBox.style.width = crop.w + 'px'; cropBox.style.height = crop.h + 'px';
+
+            const nRect = nCont.getBoundingClientRect();
+            const nScale = Math.min(nRect.width / img.w, nRect.height / img.h);
+            const nX = (nRect.width - img.w * nScale) / 2, nY = (nRect.height - img.h * nScale) / 2;
+            navImg.style.transform = `translate(${nX}px, ${nY}px) scale(${nScale})`;
+
+            const relX = (crop.x - view.x) / view.scale, relY = (crop.y - view.y) / view.scale;
+            const relW = crop.w / view.scale, relH = crop.h / view.scale;
+            navBox.style.left = (nX + relX * nScale) + 'px'; navBox.style.top = (nY + relY * nScale) + 'px';
+            navBox.style.width = (relW * nScale) + 'px'; navBox.style.height = (relH * nScale) + 'px';
+        }
+    </script>
+</body>
+</html>
