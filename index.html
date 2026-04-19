@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>PWA Test App</title>
+    <style>
+        body { margin: 0; background: #111; overflow: hidden; display: flex; flex-direction: column; align-items: center; }
+        .canvas { width: 90vw; margin: 10px 0; background: #222; position: relative; overflow: hidden; touch-action: none; }
+        #nav-container { height: 30vh; }
+        #main-container { height: 50vh; background: #333; }
+        
+        /* 画像：JSで完全に制御するため、初期位置は左上固定 */
+        #main-img, #nav-img { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
+        
+        /* 枠：これも左上からの絶対座標で管理 */
+        .crop-box { position: absolute; border: 2px solid blue; box-sizing: border-box; z-index: 10; pointer-events: none; }
+        .nav-box { position: absolute; border: 1px solid red; background: rgba(255, 0, 0, 0.2); z-index: 10; pointer-events: none; }
+    </style>
+</head>
+<body>
+    <div id="nav-container" class="canvas"><img id="nav-img"><div id="nav-box" class="nav-box"></div></div>
+    <div id="main-container" class="canvas"><img id="main-img"><div id="crop-box" class="crop-box"></div></div>
+    <div style="margin-top:10px;"><input type="file" id="file-input" accept="image/*"></div>
+
+    <script>
+              const navImg = document.getElementById('nav-img'), mainImg = document.getElementById('main-img'), navBox = document.getElementById('nav-box'), cropBox = document.getElementById('crop-box');
+        const mCont = document.getElementById('main-container'), nCont = document.getElementById('nav-container');
+
+        let img = { w: 0, h: 0 };
+        let view = { x: 0, y: 0, scale: 1 }; 
+        let crop = { x: 0, y: 0, w: 200, h: 200 }; // 枠サイズを少し大きく固定
+
+        document.getElementById('file-input').onchange = (e) => {
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                navImg.src = mainImg.src = ev.target.result;
+                mainImg.onload = () => {
+                    img.w = mainImg.naturalWidth; img.h = mainImg.naturalHeight;
+                    const mRect = mCont.getBoundingClientRect();
+                    view.scale = Math.min(mRect.width / img.w, mRect.height / img.h);
+                    view.x = (mRect.width - img.w * view.scale) / 2;
+                    view.y = (mRect.height - img.h * view.scale) / 2;
+                    crop.x = (mRect.width - crop.w) / 2;
+                    crop.y = (mRect.height - crop.h) / 2;
+                    update();
+                };
+            };
+            reader.readAsDataURL(e.target.files);
+        };
+
+        let isDrag = false, last = { x: 0, y: 0, dist: 0, scale: 1 };
+        
+        mCont.ontouchstart = (e) => {
+            if(e.touches.length === 1){
+                isDrag = true;
+                last.x = e.touches[0].pageX; last.y = e.touches[0].pageY;
+            } else if (e.touches.length === 2) {
+                isDrag = false; // 2本指の時はスクロールを止める
+                last.dist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+                last.scale = view.scale;
+            }
+        };
+
+        mCont.ontouchmove = (e) => {
+            if (e.touches.length === 1 && isDrag) {
+                // 1本指：スクロール
+                view.x += (e.touches[0].pageX - last.x);
+                view.y += (e.touches[0].pageY - last.y);
+                last.x = e.touches[0].pageX; last.y = e.touches[0].pageY;
+            } else if (e.touches.length === 2) {
+                // 2本指：ピンチズーム
+                const dist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+                const zoom = dist / last.dist;
+                
+                // キャンバスの中心を基準にズームするための座標調整
+                const mRect = mCont.getBoundingClientRect();
+                const centerX = mRect.width / 2;
+                const centerY = mRect.height / 2;
+                
+                const newScale = last.scale * zoom;
+                // 中心点を維持するための位置計算
+                view.x = centerX - (centerX - view.x) * (newScale / view.scale);
+                view.y = centerY - (centerY - view.y) * (newScale / view.scale);
+                view.scale = newScale;
+            }
+            update();
+        };
+
+        mCont.ontouchend = () => { isDrag = false; };
+
+        function update() {
+            mainImg.style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.scale})`;
+            cropBox.style.left = crop.x + 'px'; cropBox.style.top = crop.y + 'px';
+            cropBox.style.width = crop.w + 'px'; cropBox.style.height = crop.h + 'px';
+
+            const nRect = nCont.getBoundingClientRect();
+            const nScale = Math.min(nRect.width / img.w, nRect.height / img.h);
+            const nX = (nRect.width - img.w * nScale) / 2;
+            const nY = (nRect.height - img.h * nScale) / 2;
+            navImg.style.transform = `translate(${nX}px, ${nY}px) scale(${nScale})`;
+
+            const relX = (crop.x - view.x) / view.scale;
+            const relY = (crop.y - view.y) / view.scale;
+            const relW = crop.w / view.scale;
+            const relH = crop.h / view.scale;
+
+            navBox.style.left = (nX + relX * nScale) + 'px';
+            navBox.style.top = (nY + relY * nScale) + 'px';
+            navBox.style.width = (relW * nScale) + 'px';
+            navBox.style.height = (relH * nScale) + 'px';
+        }
+    </script>
+</body>
+</html>
