@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>PWA Test App</title>
+    <style>
+        body { margin: 0; background: #111; color: white; font-family: sans-serif; overflow: hidden; }
+        
+        /* ナビキャンバス (30vh) */
+        #nav-container {
+            height: 30vh; width: 90vw; margin: 10px auto;
+            background: #222; position: relative; overflow: hidden;
+        }
+
+        /* 作業キャンバス (50vh) */
+        #main-container {
+            height: 50vh; width: 90vw; margin: 0 auto;
+            background: #333; position: relative; overflow: hidden;
+            display: flex; align-items: center; justify-content: center;
+        }
+
+        /* 共通の画像スタイル */
+        .preview-img { max-height: 100%; max-width: 100%; object-fit: contain; }
+
+        /* 選択枠（赤：ナビ用、青：作業用） */
+        .crop-box {
+            position: absolute; border: 2px solid blue; box-sizing: border-box;
+        }
+        .nav-box {
+            position: absolute; border: 1px solid red; background: rgba(255, 0, 0, 0.2);
+        }
+
+        .footer { text-align: center; margin-top: 20px; }
+        .file-btn {
+            display: inline-block; width: 60px; height: 60px;
+            background: white; border-radius: 50%; font-size: 30px;
+            line-height: 60px; cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="nav-container">
+        <div id="nav-box" class="nav-box" style="display:none;"></div>
+        <img id="nav-img" class="preview-img">
+    </div>
+
+    <div id="main-container">
+        <div id="main-instruction">ファイルを選択してください</div>
+        <img id="main-img" class="preview-img" style="display:none;">
+        <div id="crop-box" class="crop-box" style="display:none;">
+            <!-- 辺の当たり判定用（後で実装） -->
+        </div>
+    </div>
+
+    <div class="footer">
+        <input type="file" id="file-input" accept="image/*" hidden>
+        <label for="file-input" class="file-btn">📁</label>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('file-input');
+        const navImg = document.getElementById('nav-img');
+        const mainImg = document.getElementById('main-img');
+        const navBox = document.getElementById('nav-box');
+        const cropBox = document.getElementById('crop-box');
+        const instruction = document.getElementById('main-instruction');
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const src = event.target.result;
+                    navImg.src = src;
+                    mainImg.src = src;
+                    
+                    // 表示を切り替え
+                    instruction.style.display = 'none';
+                    mainImg.style.display = 'block';
+                    navBox.style.display = 'block';
+                    cropBox.style.display = 'block';
+
+                    // 枠の初期位置（例：中央に80%のサイズ）
+                    updateBox(10, 10, 80, 80);
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        function updateBox(x, y, w, h) {
+            // ナビ用の枠を更新
+            navBox.style.left = x + '%';
+            navBox.style.top = y + '%';
+            navBox.style.width = w + '%';
+            navBox.style.height = h + '%';
+
+            // 作業用の枠を更新
+            cropBox.style.left = x + '%';
+            cropBox.style.top = y + '%';
+            cropBox.style.width = w + '%';
+            cropBox.style.height = h + '%';
+        }
+    </script>
+</body>
+</html>
