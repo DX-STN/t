@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>PWA Test App</title>
+    <style>
+        body { margin: 0; background: #111; color: white; font-family: sans-serif; overflow: hidden; display: flex; flex-direction: column; align-items: center; }
+        
+        .canvas {
+            width: 90vw; margin: 10px 0; background: #222;
+            position: relative; overflow: hidden;
+            display: flex; align-items: center; justify-content: center;
+        }
+        #nav-container { height: 30vh; }
+        #main-container { height: 50vh; background: #333; }
+
+        /* 画像表示用：CSSのcontainで中央寄せを維持 */
+        .preview-img { max-height: 100%; max-width: 100%; object-fit: contain; }
+
+        /* 枠：JSでピクセル計算して配置する */
+        .crop-box { position: absolute; border: 2px solid blue; box-sizing: border-box; pointer-events: none; }
+        .nav-box { position: absolute; border: 1px solid red; background: rgba(255, 0, 0, 0.2); pointer-events: none; }
+
+        .footer { margin-top: 10px; }
+        .file-btn {
+            display: inline-block; width: 60px; height: 60px;
+            background: white; border-radius: 50%; font-size: 30px;
+            line-height: 60px; cursor: pointer; text-align: center; color: black;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="nav-container" class="canvas">
+        <img id="nav-img" class="preview-img">
+        <div id="nav-box" class="nav-box"></div>
+    </div>
+
+    <div id="main-container" class="canvas">
+        <div id="main-instruction">画像を選択してください</div>
+        <img id="main-img" class="preview-img">
+        <div id="crop-box" class="crop-box"></div>
+    </div>
+
+    <div class="footer">
+        <input type="file" id="file-input" accept="image/*" hidden>
+        <label for="file-input" class="file-btn">📁</label>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('file-input');
+        const navImg = document.getElementById('nav-img');
+        const mainImg = document.getElementById('main-img');
+        const navBox = document.getElementById('nav-box');
+        const cropBox = document.getElementById('crop-box');
+
+        // 画像のメタデータ（ピクセル基準）
+        let imgData = { naturalW: 0, naturalH: 0 };
+        // 選択範囲（ピクセル基準：初期値は後で計算）
+        let selection = { x: 0, y: 0, w: 0, h: 0 };
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const src = event.target.result;
+                    navImg.src = src;
+                    mainImg.src = src;
+                    
+                    mainImg.onload = () => {
+                        // 1. 画像の本来のサイズを取得
+                        imgData.naturalW = mainImg.naturalWidth;
+                        imgData.naturalH = mainImg.naturalHeight;
+
+                        // 2. 初期選択範囲を画像の中央に設定（例：画像の50%のサイズ）
+                        selection.w = imgData.naturalW * 0.5;
+                        selection.h = imgData.naturalH * 0.5;
+                        selection.x = (imgData.naturalW - selection.w) / 2;
+                        selection.y = (imgData.naturalH - selection.h) / 2;
+
+                        document.getElementById('main-instruction').style.display = 'none';
+                        updateAllBoxes();
+                    };
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // 画面リサイズ時にも枠を再計算
+        window.onresize = updateAllBoxes;
+
+        function updateAllBoxes() {
+            if (imgData.naturalW === 0) return;
+            applyBoxUpdate(navImg, navBox);
+            applyBoxUpdate(mainImg, cropBox);
+        }
+
+        function applyBoxUpdate(imgElement, boxElement) {
+            // 画像が実際に画面上で表示されているサイズ(contain適用後)を取得
+            const rect = imgElement.getBoundingClientRect();
+            const parentRect = imgElement.parentElement.getBoundingClientRect();
+
+            // 表示倍率を計算
+            const scale = rect.width / imgData.naturalW;
+
+            // 枠の表示位置を計算（画像の表示位置を基準にする）
+            const displayX = (rect.left - parentRect.left) + (selection.x * scale);
+            const displayY = (rect.top - parentRect.top) + (selection.y * scale);
+            const displayW = selection.w * scale;
+            const displayH = selection.h * scale;
+
+            boxElement.style.left = displayX + 'px';
+            boxElement.style.top = displayY + 'px';
+            boxElement.style.width = displayW + 'px';
+            boxElement.style.height = displayH + 'px';
+        }
+    </script>
+</body>
+</html>
