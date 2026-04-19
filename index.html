@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>PWA Test App</title>
+    <style>
+        body { margin: 0; background: #111; color: white; overflow: hidden; display: flex; flex-direction: column; align-items: center; }
+        .canvas { width: 90vw; margin: 10px 0; background: #222; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; touch-action: none; }
+        #nav-container { height: 30vh; }
+        #main-container { height: 50vh; background: #333; }
+        
+        /* 画像：中央基点で動かす */
+        .preview-img { position: absolute; transform-origin: center; max-height: 100%; max-width: 100%; object-fit: contain; }
+        
+        /* 枠：キャンバスに対して絶対配置（画像と一緒に動かない） */
+        .crop-box { position: absolute; border: 2px solid blue; box-sizing: border-box; z-index: 10; pointer-events: none; }
+        .nav-box { position: absolute; border: 1px solid red; background: rgba(255, 0, 0, 0.2); z-index: 10; pointer-events: none; }
+    </style>
+</head>
+<body>
+    <div id="nav-container" class="canvas">
+        <img id="nav-img" class="preview-img">
+        <div id="nav-box" class="nav-box"></div>
+    </div>
+    <div id="main-container" class="canvas">
+        <img id="main-img" class="preview-img">
+        <div id="crop-box" class="crop-box"></div>
+    </div>
+
+    <div style="margin-top:20px;">
+        <input type="file" id="file-input" accept="image/*">
+    </div>
+
+    <script>
+        const navImg = document.getElementById('nav-img'), mainImg = document.getElementById('main-img'), navBox = document.getElementById('nav-box'), cropBox = document.getElementById('crop-box');
+        let imgData = { w: 0, h: 0, displayW: 0, displayH: 0 };
+        let view = { zoom: 1, x: 0, y: 0 };
+
+        document.getElementById('file-input').onchange = (e) => {
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                navImg.src = mainImg.src = ev.target.result;
+                mainImg.onload = () => {
+                    imgData.w = mainImg.naturalWidth;
+                    imgData.h = mainImg.naturalHeight;
+                    // 画像の初期表示サイズ（contain）を取得
+                    const rect = mainImg.getBoundingClientRect();
+                    imgData.displayW = rect.width;
+                    imgData.displayH = rect.height;
+                    
+                    // 枠をキャンバス中央に固定（例：150px四方）
+                    cropBox.style.width = '150px';
+                    cropBox.style.height = '150px';
+                    updateDisplay();
+                };
+            };
+            reader.readAsDataURL(e.target.files[0]);
+        };
+
+        // 一本指スクロールのテスト実装
+        let isDragging = false, lastX, lastY;
+        document.getElementById('main-container').ontouchstart = (e) => {
+            if(e.touches.length === 1) {
+                isDragging = true;
+                lastX = e.touches[0].pageX;
+                lastY = e.touches[0].pageY;
+            }
+        };
+
+        document.getElementById('main-container').ontouchmove = (e) => {
+            if(!isDragging) return;
+            view.x += (e.touches[0].pageX - lastX);
+            view.y += (e.touches[0].pageY - lastY);
+            lastX = e.touches[0].pageX;
+            lastY = e.touches[0].pageY;
+            updateDisplay();
+        };
+
+        document.getElementById('main-container').ontouchend = () => isDragging = false;
+
+        function updateDisplay() {
+            // メイン画像の移動
+            mainImg.style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.zoom})`;
+
+            // 【重要】ナビ側の枠を計算（①の解決）
+            // メインの枠が「画像のどのピクセル位置にいるか」を計算し、ナビに反映
+            const navRect = navImg.getBoundingClientRect();
+            const scale = (imgData.displayW * view.zoom) / navRect.width;
+
+            // 逆算：メインの枠の中央が、画像の中心からどれだけズレているか
+            const offsetXInImg = -view.x / scale;
+            const offsetYInImg = -view.y / scale;
+
+            navBox.style.width = (150 / scale) + 'px';
+            navBox.style.height = (150 / scale) + 'px';
+            navBox.style.left = `calc(50% + ${offsetXInImg}px - ${(150/scale)/2}px)`;
+            navBox.style.top = `calc(50% + ${offsetYInImg}px - ${(150/scale)/2}px)`;
+        }
+    </script>
+</body>
+</html>
