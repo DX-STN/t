@@ -104,8 +104,8 @@
             cropBox.style.width = crop.w + 'px'; cropBox.style.height = crop.h + 'px';
 
             const hn = document.getElementById('hn'), hs = document.getElementById('hs'), he = document.getElementById('he'), hw = document.getElementById('hw');
-            if (crop.w < crop.h) { he.style.zIndex = hw.style.zIndex = "1000"; hn.style.zIndex = hs.style.zIndex = "500"; }
-            else { hn.style.zIndex = hs.style.zIndex = "1000"; he.style.zIndex = hw.style.zIndex = "500"; }
+            if (crop.w < crop.h) { he.style.zIndex = hw.style.zIndex = "10"; hn.style.zIndex = hs.style.zIndex = "500"; }
+            else { hn.style.zIndex = hs.style.zIndex = "10"; he.style.zIndex = hw.style.zIndex = "500"; }
 
             const nRect = nCont.getBoundingClientRect(), nScale = Math.min(nRect.width / img.w, nRect.height / img.h), nX = (nRect.width - img.w * nScale) / 2, nY = (nRect.height - img.h * nScale) / 2;
             navImg.style.transform = `translate(${nX}px, ${nY}px) scale(${nScale})`;
@@ -115,8 +115,8 @@
             const relCX = (crop.x + crop.w/2 - view.x) / view.scale - img.w/2, relCY = (crop.y + crop.h/2 - view.y) / view.scale - img.h/2;
             
             navBox.style.width = fW + 'px'; navBox.style.height = fH + 'px';
-            navBox.style.left = (imgCX + relCX * nScale - fW/2 - 30) + 'px';
-            navBox.style.top = (imgCY + relCY * nScale - fH/2 - 30) + 'px';
+            navBox.style.left = (imgCX + relCX * nScale - fW/2 - 5) + 'px';
+            navBox.style.top = (imgCY + relCY * nScale - fH/2 - 5) + 'px';
         }
     </script>
 </body>
