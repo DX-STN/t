@@ -115,8 +115,8 @@
             const relCX = (crop.x + crop.w/2 - view.x) / view.scale - img.w/2, relCY = (crop.y + crop.h/2 - view.y) / view.scale - img.h/2;
             
             navBox.style.width = fW + 'px'; navBox.style.height = fH + 'px';
-            navBox.style.left = (imgCX + relCX * nScale - fW/2 - 3) + 'px';
-            navBox.style.top = (imgCY + relCY * nScale - fH/2 - 3) + 'px';
+            navBox.style.left = (imgCX + relCX * nScale - fW/2 - 1) + 'px';
+            navBox.style.top = (imgCY + relCY * nScale - fH/2 - 1) + 'px';
         }
     </script>
 </body>
