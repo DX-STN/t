@@ -17,8 +17,8 @@
             display: none; image-rendering: pixelated; 
         }
         
-        .crop-box { position: absolute; border: 2px solid blue; box-sizing: border-box; z-index: 20; display: none; pointer-events: none; }
-        .nav-box { position: absolute; border: 1px solid red; background: rgba(255, 0, 0, 0.2); z-index: 10; pointer-events: none; display: none; }
+        .crop-box { position: absolute; border: 2px solid blue; box-sizing: border-box; z-index: 20; display: none; pointer-events: none; }/*✪20*/
+        .nav-box { position: absolute; border: 1px solid red; background: rgba(255, 0, 0, 0.2); z-index: 10; pointer-events: none; display: none; }/*✪10*/
         .handle { position: absolute; background: rgba(0, 100, 255, 0.05); pointer-events: auto; }
         .h-n, .h-s { left: 0; right: 0; height: 100px; }
         .h-e, .h-w { top: 0; bottom: 0; width: 100px; }
@@ -112,13 +112,13 @@
             cropBox.style.width = crop.w + 'px'; cropBox.style.height = crop.h + 'px';
 
             const hn = document.getElementById('hn'), hs = document.getElementById('hs'), he = document.getElementById('he'), hw = document.getElementById('hw');
-            if (crop.w < crop.h) { he.style.zIndex = hw.style.zIndex = "60"; hn.style.zIndex = hs.style.zIndex = "70"; }
-            else { hn.style.zIndex = hs.style.zIndex = "60"; he.style.zIndex = hw.style.zIndex = "70"; }
+            if (crop.w < crop.h) { he.style.zIndex = hw.style.zIndex = "60"; hn.style.zIndex = hs.style.zIndex = "70"; }//✪60 70
+            else { hn.style.zIndex = hs.style.zIndex = "60"; he.style.zIndex = hw.style.zIndex = "70"; }//✪60 70
 
             const nRect = nCont.getBoundingClientRect(), nScale = Math.min(nRect.width / img.w, nRect.height / img.h), nX = (nRect.width - img.w * nScale) / 2, nY = (nRect.height - img.h * nScale) / 2;
             navImg.style.transform = `translate(${nX}px, ${nY}px) scale(${nScale})`;
             const imgCX = nX + (img.w * nScale) / 2, imgCY = nY + (img.h * nScale) / 2, relCX = (crop.x + crop.w/2 - view.x) / view.scale - img.w/2, relCY = (crop.y + crop.h/2 - view.y) / view.scale - img.h/2, fW = (crop.w / view.scale * nScale), fH = (crop.h / view.scale * nScale);
-            navBox.style.width = fW + 'px'; navBox.style.height = fH + 'px'; navBox.style.left = (imgCX + relCX * nScale - fW/2 - 0.75) + 'px'; navBox.style.top = (imgCY + relCY * nScale - fH/2 -0.75) + 'px';
+            navBox.style.width = fW + 'px'; navBox.style.height = fH + 'px'; navBox.style.left = (imgCX + relCX * nScale - fW/2 - 0.75) + 'px'; navBox.style.top = (imgCY + relCY * nScale - fH/2 -0.75) + 'px';//✪-0.75 -0.75
         }
     </script>
 </body>
