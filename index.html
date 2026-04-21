@@ -104,8 +104,8 @@
             cropBox.style.width = crop.w + 'px'; cropBox.style.height = crop.h + 'px';
 
             const hn = document.getElementById('hn'), hs = document.getElementById('hs'), he = document.getElementById('he'), hw = document.getElementById('hw');
-            if (crop.w < crop.h) { he.style.zIndex = hw.style.zIndex = "100"; hn.style.zIndex = hs.style.zIndex = "500"; }
-            else { hn.style.zIndex = hs.style.zIndex = "100"; he.style.zIndex = hw.style.zIndex = "500"; }
+            if (crop.w < crop.h) { he.style.zIndex = hw.style.zIndex = "60"; hn.style.zIndex = hs.style.zIndex = "70"; }
+            else { hn.style.zIndex = hs.style.zIndex = "60"; he.style.zIndex = hw.style.zIndex = "70"; }
 
             const nRect = nCont.getBoundingClientRect(), nScale = Math.min(nRect.width / img.w, nRect.height / img.h), nX = (nRect.width - img.w * nScale) / 2, nY = (nRect.height - img.h * nScale) / 2;
             navImg.style.transform = `translate(${nX}px, ${nY}px) scale(${nScale})`;
