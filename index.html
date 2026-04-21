@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>PWA Test App - Handle Fix</title>
+    <style>
+        body { margin: 0; background: #111; overflow: hidden; display: flex; flex-direction: column; align-items: center; user-select: none; -webkit-user-select: none; }
+        .canvas { width: 90vw; margin: 10px 0; background: #222; position: relative; overflow: hidden; touch-action: none; }
+        #nav-container { height: 30vh; }
+        #main-container { height: 50vh; background: #333; }
+        .smooth-move { transition: transform 0.3s ease-out, left 0.3s ease-out, top 0.3s ease-out, width 0.3s ease-out, height 0.3s ease-out; }
+        #main-img, #nav-img { position: absolute; top: 0; left: 0; transform-origin: 0 0; pointer-events: none; display: none; image-rendering: pixelated; }
+        .crop-box { position: absolute; border: 2px solid blue; box-sizing: border-box; z-index: 10; display: none; pointer-events: none; }
+        .nav-box { position: absolute; border: 1px solid red; background: rgba(255, 0, 0, 0.2); z-index: 10; pointer-events: none; display: none; }
+        
+        /* ハンドル：判定エリア（透明だが確実に枠に追従させる） */
+        .handle { position: absolute; background: rgba(0, 100, 255, 0.05); pointer-events: auto; }
+        .h-n, .h-s { height: 100px; left: 0; right: 0; }
+        .h-e, .h-w { width: 100px; top: 0; bottom: 0; }
+        /* update内で位置を直接上書きするため、ここでは基本形のみ */
+    </style>
+</head>
+<body>
+    <div id="nav-container" class="canvas"><img id="nav-img"><div id="nav-box" class="nav-box"></div></div>
+    <div id="main-container" class="canvas">
+        <img id="main-img">
+        <div id="crop-box" class="crop-box"></div>
+        <!-- ハンドルを独立させ、updateで枠に吸着させる -->
+        <div id="hn" class="handle h-n" data-edge="n"></div>
+        <div id="hs" class="handle h-s" data-edge="s"></div>
+        <div id="he" class="handle h-e" data-edge="e"></div>
+        <div id="hw" class="handle h-w" data-edge="w"></div>
+    </div>
+    <div class="footer"><input type="file" id="file-input" accept="image/*" hidden><label for="file-input" class="file-btn">📁</label></div>
+
+    <script>
+        const navImg = document.getElementById('nav-img'), mainImg = document.getElementById('main-img'), navBox = document.getElementById('nav-box'), cropBox = document.getElementById('crop-box'), mCont = document.getElementById('main-container'), nCont = document.getElementById('nav-container');
+        const h = { n: document.getElementById('hn'), s: document.getElementById('hs'), e: document.getElementById('he'), w: document.getElementById('hw') };
+        let img = { w: 0, h: 0, isLoaded: false }, view = { x: 0, y: 0, scale: 1 }, sel = { x: 0, y: 0, w: 0, h: 0 };
+        let touch = { mode: '', lastX: 0, lastY: 0, lastDist: 0, lastScale: 1, edge: '' };
+
+        document.getElementById('file-input').onchange = (e) => {
+            const file = e.target.files[0]; if (!file) return;
+            const reader = new FileReader(); reader.onload = (ev) => {
+                navImg.src = mainImg.src = ev.target.result;
+                mainImg.onload = () => {
+                    img.w = mainImg.naturalWidth; img.h = mainImg.naturalHeight; img.isLoaded = true;
+                    const mRect = mCont.getBoundingClientRect();
+                    view.scale = Math.min(mRect.width / img.w, mRect.height / img.h);
+                    view.x = (mRect.width - img.w * view.scale) / 2; view.y = (mRect.height - img.h * view.scale) / 2;
+                    sel = { x: 0, y: 0, w: img.w, h: img.h };
+                    mainImg.style.display = navImg.style.display = cropBox.style.display = navBox.style.display = 'block';
+                    update(false);
+                };
+            }; reader.readAsDataURL(file);
+        };
+
+        mCont.addEventListener('touchstart', (e) => {
+            if (!img.isLoaded) return;
+            [mainImg, cropBox, ...Object.values(h)].forEach(el => el.classList.remove('smooth-move'));
+            const t = e.touches;
+            if (t.length === 2) {
+                touch.mode = 'zoom';
+                touch.lastDist = Math.hypot(t[1].pageX - t[0].pageX, t[1].pageY - t[0].pageY);
+                touch.lastScale = view.scale;
+            } else {
+                if (e.target.classList.contains('handle')) { touch.mode = 'edit'; touch.edge = e.target.dataset.edge; }
+                else { touch.mode = 'scroll'; }
+                touch.lastX = t[0].pageX; touch.lastY = t[0].pageY;
+            }
+        }, { passive: false });
+
+        mCont.addEventListener('touchmove', (e) => {
+            if (!img.isLoaded || !touch.mode) return; e.preventDefault();
+            const t = e.touches;
+            if (touch.mode === 'zoom' && t.length === 2) {
+                const dist = Math.hypot(t[1].pageX - t[0].pageX, t[1].pageY - t[0].pageY);
+                const newScale = touch.lastScale * (dist / touch.lastDist);
+                const mRect = mCont.getBoundingClientRect();
+                const cx = mRect.width / 2, cy = mRect.height / 2;
+                view.x = cx - (cx - view.x) * (newScale / view.scale);
+                view.y = cy - (cy - view.y) * (newScale / view.scale);
+                view.scale = newScale;
+            } else if (touch.mode === 'scroll' && t.length === 1) {
+                view.x += (t[0].pageX - touch.lastX); view.y += (t[0].pageY - touch.lastY);
+                touch.lastX = t[0].pageX; touch.lastY = t[0].pageY;
+            } else if (touch.mode === 'edit' && t.length === 1) {
+                const dx = (t[0].pageX - touch.lastX) / view.scale, dy = (t[0].pageY - touch.lastY) / view.scale;
+                const min = 1;
+                if (touch.edge === 'n') { let d = Math.min(dy, sel.h - min); sel.y += d; sel.h -= d; }
+                if (touch.edge === 's') { sel.h = Math.max(min, sel.h + dy); }
+                if (touch.edge === 'e') { sel.w = Math.max(min, sel.w + dx); }
+                if (touch.edge === 'w') { let d = Math.min(dx, sel.w - min); sel.x += d; sel.w -= d; }
+                touch.lastX = t[0].pageX; touch.lastY = t[0].pageY;
+            }
+            update(false);
+        }, { passive: false });
+
+        mCont.addEventListener('touchend', () => {
+            if (!img.isLoaded) return;
+            if (touch.mode === 'edit' || touch.mode === 'zoom') {
+                sel.x = Math.round(sel.x); sel.y = Math.round(sel.y);
+                sel.w = Math.round(sel.w); sel.h = Math.round(sel.h);
+            }
+            if (touch.mode === 'edit') {
+                [mainImg, cropBox, ...Object.values(h)].forEach(el => el.classList.add('smooth-move'));
+                fitToCrop();
+            }
+            touch.mode = '';
+        });
+
+        function fitToCrop() {
+            const mRect = mCont.getBoundingClientRect();
+            view.scale = Math.min(mRect.width / sel.w, mRect.height / sel.h);
+            view.x = (mRect.width / 2) - (sel.x + sel.w / 2) * view.scale;
+            view.y = (mRect.height / 2) - (sel.y + sel.h / 2) * view.scale;
+            update(true);
+        }
+
+        function update(smooth) {
+            if (!img.isLoaded) return;
+            mainImg.style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.scale})`;
+            const cL = view.x + sel.x * view.scale, cT = view.y + sel.y * view.scale, cW = sel.w * view.scale, cH = sel.h * view.scale;
+            cropBox.style.left = cL + 'px'; cropBox.style.top = cT + 'px'; cropBox.style.width = cW + 'px'; cropBox.style.height = cH + 'px';
+
+            // Z-index制御
+            const isVert = sel.w < sel.h;
+            h.e.style.zIndex = h.w.style.zIndex = isVert ? "100" : "50";
+            h.n.style.zIndex = h.s.style.zIndex = isVert ? "50" : "100";
+
+            // ハンドルの再配置（枠のラインに厳密に固定）
+            const pad = 50; 
+            h.n.style.top = (cT - pad) + 'px'; h.n.style.left = (cL + 5) + 'px'; h.n.style.width = (cW - 10) + 'px';
+            h.s.style.top = (cT + cH - pad) + 'px'; h.s.style.left = (cL + 5) + 'px'; h.s.style.width = (cW - 10) + 'px';
+            h.w.style.left = (cL - pad) + 'px'; h.w.style.top = (cT + 5) + 'px'; h.w.style.height = (cH - 10) + 'px';
+            h.e.style.left = (cL + cW - pad) + 'px'; h.e.style.top = (cT + 5) + 'px'; h.e.style.height = (cH - 10) + 'px';
+
+            const nRect = nCont.getBoundingClientRect(), nScale = Math.min(nRect.width / img.w, nRect.height / img.h);
+            const nX = (nRect.width - img.w * nScale) / 2, nY = (nRect.height - img.h * nScale) / 2;
+            navImg.style.transform = `translate(${nX}px, ${nY}px) scale(${nScale})`;
+            navBox.style.width = (sel.w * nScale) + 'px'; navBox.style.height = (sel.h * nScale) + 'px';
+            navBox.style.left = (nX + sel.x * nScale - 0.75) + 'px'; navBox.style.top = (nY + sel.y * nScale - 0.75) + 'px';
+        }
+    </script>
+</body>
+</html>
