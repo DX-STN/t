@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>PWA Test App - Free Manual Control</title>
+    <style>
+        body { margin: 0; background: #111; overflow: hidden; display: flex; flex-direction: column; align-items: center; }
+        .canvas { width: 90vw; margin: 10px 0; background: #222; position: relative; overflow: hidden; touch-action: none; }
+        #nav-container { height: 30vh; }
+        #main-container { height: 50vh; background: #333; }
+        #main-img, #nav-img { position: absolute; top: 0; left: 0; transform-origin: 0 0; pointer-events: none; display: none; image-rendering: pixelated; }
+        .crop-box { position: absolute; border: 2px solid blue; box-sizing: border-box; z-index: 10; display: none; pointer-events: none; }
+        .nav-box { position: absolute; border: 1px solid red; background: rgba(255, 0, 0, 0.2); z-index: 10; pointer-events: none; display: none; }
+        .handle { position: absolute; background: rgba(0, 100, 255, 0.1); pointer-events: auto; z-index: 30; }
+        .h-n, .h-s { height: 60px; } .h-e, .h-w { width: 60px; }
+        .footer { margin-top: 10px; }
+        .file-btn { display: inline-block; width: 60px; height: 60px; background: white; border-radius: 50%; font-size: 30px; line-height: 60px; cursor: pointer; text-align: center; color: black; }
+    </style>
+</head>
+<body>
+    <div id="nav-container" class="canvas"><img id="nav-img"><div id="nav-box" class="nav-box"></div></div>
+    <div id="main-container" class="canvas">
+        <img id="main-img">
+        <div id="crop-box" class="crop-box"></div>
+        <div id="hn" class="handle h-n" data-edge="n"></div><div id="hs" class="handle h-s" data-edge="s"></div>
+        <div id="he" class="handle h-e" data-edge="e"></div><div id="hw" class="handle h-w" data-edge="w"></div>
+    </div>
+    <div class="footer"><input type="file" id="file-input" accept="image/*" hidden><label for="file-input" class="file-btn">📁</label></div>
+
+    <script>
+        const navImg = document.getElementById('nav-img'), mainImg = document.getElementById('main-img'), navBox = document.getElementById('nav-box'), cropBox = document.getElementById('crop-box'), mCont = document.getElementById('main-container'), nCont = document.getElementById('nav-container');
+        const h = { n: document.getElementById('hn'), s: document.getElementById('hs'), e: document.getElementById('he'), w: document.getElementById('hw') };
+        let img = { w: 0, h: 0, isLoaded: false }, view = { x: 0, y: 0, scale: 1 }, crop = { x: 0, y: 0, w: 0, h: 0 };
+        let touch = { mode: '', lastX: 0, lastY: 0, lastDist: 0, lastScale: 1, edge: '' };
+
+        document.getElementById('file-input').onchange = (e) => {
+            const file = e.target.files[0]; if (!file) return;
+            const reader = new FileReader(); reader.onload = (ev) => {
+                navImg.src = mainImg.src = ev.target.result;
+                mainImg.onload = () => {
+                    img.w = mainImg.naturalWidth; img.h = mainImg.naturalHeight; img.isLoaded = true;
+                    const mRect = mCont.getBoundingClientRect();
+                    view.scale = Math.min(mRect.width / img.w, mRect.height / img.h);
+                    view.x = (mRect.width - img.w * view.scale) / 2; view.y = (mRect.height - img.h * view.scale) / 2;
+                    crop = { x: view.x, y: view.y, w: img.w * view.scale, h: img.h * view.scale };
+                    mainImg.style.display = navImg.style.display = cropBox.style.display = navBox.style.display = 'block';
+                    update();
+                };
+            }; reader.readAsDataURL(file);
+        };
+
+        mCont.addEventListener('touchstart', (e) => {
+            if (!img.isLoaded) return;
+            const t = e.touches;
+            if (t.length === 2) {
+                touch.mode = 'zoom';
+                touch.lastDist = Math.hypot(t[0].pageX - t[1].pageX, t[0].pageY - t[1].pageY);
+                touch.lastScale = view.scale;
+            } else {
+                if (e.target.classList.contains('handle')) { touch.mode = 'edit'; touch.edge = e.target.dataset.edge; }
+                else { touch.mode = 'scroll'; }
+                touch.lastX = t[0].pageX; touch.lastY = t[0].pageY;
+            }
+        }, { passive: false });
+
+        mCont.addEventListener('touchmove', (e) => {
+            if (!img.isLoaded || !touch.mode) return; e.preventDefault();
+            const t = e.touches;
+            if (touch.mode === 'zoom' && t.length === 2) {
+                const dist = Math.hypot(t[0].pageX - t[1].pageX, t[0].pageY - t[1].pageY);
+                const newScale = touch.lastScale * (dist / touch.lastDist);
+                const mRect = mCont.getBoundingClientRect();
+                const cx = mRect.width / 2, cy = mRect.height / 2;
+                view.x = cx - (cx - view.x) * (newScale / view.scale);
+                view.y = cy - (cy - view.y) * (newScale / view.scale);
+                view.scale = newScale;
+            } else if (touch.mode === 'scroll') {
+                view.x += (t[0].pageX - touch.lastX); view.y += (t[0].pageY - touch.lastY);
+            } else if (touch.mode === 'edit') {
+                const dx = t[0].pageX - touch.lastX, dy = t[0].pageY - touch.lastY;
+                if (touch.edge === 'n') { crop.y += dy; crop.h -= dy; }
+                if (touch.edge === 's') { crop.h += dy; }
+                if (touch.edge === 'e') { crop.w += dx; }
+                if (touch.edge === 'w') { crop.x += dx; crop.w -= dx; }
+            }
+            if (t.length === 1) { touch.lastX = t[0].pageX; touch.lastY = t[0].pageY; }
+            update();
+        }, { passive: false });
+
+        mCont.addEventListener('touchend', () => { touch.mode = ''; });
+
+        function update() {
+            if (!img.isLoaded) return;
+            mainImg.style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.scale})`;
+            cropBox.style.left = crop.x + 'px'; cropBox.style.top = crop.y + 'px';
+            cropBox.style.width = crop.w + 'px'; cropBox.style.height = crop.h + 'px';
+
+            const offset = 10;
+            h.n.style.left = (crop.x + offset) + 'px'; h.n.style.width = (crop.w - offset * 2) + 'px'; h.n.style.top = (crop.y - 30) + 'px';
+            h.s.style.left = (crop.x + offset) + 'px'; h.s.style.width = (crop.w - offset * 2) + 'px'; h.s.style.top = (crop.y + crop.h - 30) + 'px';
+            h.w.style.top = (crop.y + offset) + 'px'; h.w.style.height = (crop.h - offset * 2) + 'px'; h.w.style.left = (crop.x - 30) + 'px';
+            h.e.style.top = (crop.y + offset) + 'px'; h.e.style.height = (crop.h - offset * 2) + 'px'; h.e.style.left = (crop.x + crop.w - 30) + 'px';
+
+            const nRect = nCont.getBoundingClientRect(), nScale = Math.min(nRect.width / img.w, nRect.height / img.h), nX = (nRect.width - img.w * nScale) / 2, nY = (nRect.height - img.h * nScale) / 2;
+            navImg.style.transform = `translate(${nX}px, ${nY}px) scale(${nScale})`;
+            const imgCX = nX + (img.w * nScale) / 2, imgCY = nY + (img.h * nScale) / 2, relCX = (crop.x + crop.w/2 - view.x) / view.scale - img.w/2, relCY = (crop.y + crop.h/2 - view.y) / view.scale - img.h/2, fW = (crop.w / view.scale * nScale), fH = (crop.h / view.scale * nScale);
+            navBox.style.width = fW + 'px'; navBox.style.height = fH + 'px'; navBox.style.left = (imgCX + relCX * nScale - fW/2 - 0.75) + 'px'; navBox.style.top = (imgCY + relCY * nScale - fH/2 - 0.75) + 'px';
+        }
+    </script>
+</body>
+</html>
